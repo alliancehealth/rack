@@ -95,8 +95,10 @@ context "Rack::Session::Cookie" do
     response1 = Rack::MockRequest.new(app).get('/')
     session_data, _ = response1["Set-Cookie"].split("--")
 
+    response2 = nil
     lambda {
-      Rack::MockRequest.new(app).get('/', "HTTP_COOKIE" => session_data)
+      response2 = Rack::MockRequest.new(app).get('/', "HTTP_COOKIE" => session_data)
     }.should.not.raise(NoMethodError)
+    response2["Set-Cookie"].should.equal(response1["Set-Cookie"])
   end
 end

@@ -53,12 +53,12 @@ module Rack
         request = Rack::Request.new(env)
         session_data = request.cookies[@key]
 
-        if @secret && session_data
-          session_data, digest = session_data.split("--")
-          session_data = nil  unless Utils.secure_compare(digest, generate_hmac(session_data))
-        end
-
         begin
+          if @secret && session_data
+            session_data, digest = session_data.split("--")
+            session_data = nil  unless Utils.secure_compare(digest, generate_hmac(session_data))
+          end
+
           session_data = session_data.unpack("m*").first
           session_data = Marshal.load(session_data)
           env["rack.session"] = session_data
