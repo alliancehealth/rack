@@ -30,11 +30,16 @@ module Rack
 
     class << self
       attr_accessor :key_space_limit
+      attr_accessor :param_depth_limit
     end
 
     # The default number of bytes to allow parameter keys to take up.
     # This helps prevent a rogue client from flooding a Request.
     self.key_space_limit = 65536
+
+    # Default depth at which the parameter parser will raise an exception for
+    # being too deep.  This helps prevent SystemStackErrors
+    self.param_depth_limit = 100
 
     # Stolen from Mongrel, with some small modifications:
     # Parses a query string by breaking it up at the '&'
@@ -95,7 +100,9 @@ module Rack
     end
     module_function :parse_nested_query
 
-    def normalize_params(params, name, v = nil)
+    def normalize_params(params, name, v = nil, depth = Utils.param_depth_limit)
+      raise RangeError if depth <= 0
+
       name =~ %r(\A[\[\]]*([^\[\]]+)\]*)
       k = $1 || ''
       after = $' || ''
@@ -113,14 +120,14 @@ module Rack
         params[k] ||= []
         raise TypeError, "expected Array (got #{params[k].class.name}) for param `#{k}'" unless params[k].is_a?(Array)
         if params[k].last.is_a?(Hash) && !params[k].last.key?(child_key)
-          normalize_params(params[k].last, child_key, v)
+          normalize_params(params[k].last, child_key, v, depth - 1)
         else
-          params[k] << normalize_params({}, child_key, v)
+          params[k] << normalize_params(params.class.new, child_key, v, depth - 1)
         end
       else
         params[k] ||= {}
         raise TypeError, "expected Hash (got #{params[k].class.name}) for param `#{k}'" unless params[k].is_a?(Hash)
-        params[k] = normalize_params(params[k], after, v)
+        params[k] = normalize_params(params[k], after, v, depth - 1)
       end
 
       return params
